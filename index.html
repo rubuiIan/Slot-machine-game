@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Machine Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- LOGIN / REGISTER PAGE -->
+    <div id="authPage" class="container">
+        <div class="login-box">
+            <div class="logo">🎰</div>
+            <h1>SLOT MACHINE GAME</h1>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="form active" onsubmit="handleLogin(event)">
+                <h2>Login</h2>
+                <div class="form-group">
+                    <label for="loginUsername">Username:</label>
+                    <input type="text" id="loginUsername" placeholder="Enter your username" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password:</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+                <p class="toggle-text">
+                    Don't have an account? <a href="#" onclick="toggleForms(); return false;">Register</a>
+                </p>
+            </form>
+
+            <!-- Register Form -->
+            <form id="registerForm" class="form" onsubmit="handleRegister(event)">
+                <h2>Register</h2>
+                <div class="form-group">
+                    <label for="regUsername">Username:</label>
+                    <input type="text" id="regUsername" placeholder="Create a username" required>
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">Password:</label>
+                    <input type="password" id="regPassword" placeholder="Create a password" required>
+                </div>
+                <div class="form-group">
+                    <label for="regConfirmPassword">Confirm Password:</label>
+                    <input type="password" id="regConfirmPassword" placeholder="Confirm your password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Register</button>
+                <p class="toggle-text">
+                    Already have an account? <a href="#" onclick="toggleForms(); return false;">Login</a>
+                </p>
+            </form>
+
+            <div id="message" class="message"></div>
+        </div>
+    </div>
+
+    <!-- GAME PAGE -->
+    <div id="gamePage" style="display:none;">
+        <div class="game-container">
+            <div class="game-header">
+                <h1>🎰 SLOT MACHINE</h1>
+                <div class="user-info">
+                    <span id="welcomeMsg"></span>
+                    <span id="balanceDisplay" class="balance"></span>
+                    <button class="btn btn-logout" onclick="handleLogout()">Logout</button>
+                </div>
+            </div>
+
+            <!-- Deposit Section -->
+            <div id="depositSection" class="game-card">
+                <h2>💰 Make a Deposit</h2>
+                <div class="form-group">
+                    <input type="number" id="depositAmount" placeholder="Enter deposit amount" min="1">
+                </div>
+                <button class="btn btn-primary" onclick="handleDeposit()">Deposit</button>
+            </div>
+
+            <!-- Slot Machine Section -->
+            <div id="slotSection" class="game-card" style="display:none;">
+                <div class="slot-display">
+                    <div id="slot0" class="slot-reel">?</div>
+                    <div id="slot1" class="slot-reel">?</div>
+                    <div id="slot2" class="slot-reel">?</div>
+                </div>
+                <div id="slot1Row" class="slot-display" style="display:none;">
+                    <div id="slot3" class="slot-reel">?</div>
+                    <div id="slot4" class="slot-reel">?</div>
+                    <div id="slot5" class="slot-reel">?</div>
+                </div>
+                <div id="slot2Row" class="slot-display" style="display:none;">
+                    <div id="slot6" class="slot-reel">?</div>
+                    <div id="slot7" class="slot-reel">?</div>
+                    <div id="slot8" class="slot-reel">?</div>
+                </div>
+
+                <div class="bet-controls">
+                    <div class="form-group">
+                        <label>Lines (1-3):</label>
+                        <input type="number" id="linesInput" min="1" max="3" value="1" onchange="updateLines()">
+                    </div>
+                    <div class="form-group">
+                        <label>Bet per line:</label>
+                        <input type="number" id="betInput" min="1" max="999999" value="1">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-spin" onclick="handleSpin()">🎰 SPIN</button>
+                <div id="spinResult" class="spin-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = "http://localhost:3000";
+        let currentBalance = 0;
+
+        function toggleForms() {
+            document.getElementById("loginForm").classList.toggle("active");
+            document.getElementById("registerForm").classList.toggle("active");
+            showMessage("", "");
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById("message");
+            msg.textContent = text;
+            msg.className = "message " + type;
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById("loginUsername").value.trim();
+            const password = document.getElementById("loginPassword").value;
+
+            const res = await fetch(`${API}/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                currentBalance = data.balance;
+                startGame(data.username, data.balance);
+            } else {
+                showMessage(data.message, "error");
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const username = document.getElementById("regUsername").value.trim();
+            const password = document.getElementById("regPassword").value;
+            const confirm = document.getElementById("regConfirmPassword").value;
+
+            if (password !== confirm) {
+                showMessage("Passwords do not match.", "error");
+                return;
+            }
+
+            const res = await fetch(`${API}/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await res.json();
+            showMessage(data.message, data.success ? "success" : "error");
+
+            if (data.success) {
+                setTimeout(() => toggleForms(), 1000);
+            }
+        }
+
+        async function handleLogout() {
+            await fetch(`${API}/logout`, { method: "POST", credentials: "include" });
+            document.getElementById("gamePage").style.display = "none";
+            document.getElementById("authPage").style.display = "flex";
+            document.getElementById("loginUsername").value = "";
+            document.getElementById("loginPassword").value = "";
+        }
+
+        function startGame(username, balance) {
+            document.getElementById("authPage").style.display = "none";
+            document.getElementById("gamePage").style.display = "block";
+            document.getElementById("welcomeMsg").textContent = `👤 ${username}`;
+            updateBalanceDisplay(balance);
+            document.getElementById("spinResult").textContent = "";
+
+            if (parseFloat(balance) > 0) {
+                document.getElementById("depositSection").style.display = "none";
+                document.getElementById("slotSection").style.display = "block";
+            } else {
+                document.getElementById("depositSection").style.display = "block";
+                document.getElementById("slotSection").style.display = "none";
+            }
+}
+
+        function updateBalanceDisplay(balance) {
+            currentBalance = parseFloat(balance) || 0;
+            document.getElementById("balanceDisplay").textContent = `$${currentBalance}`;
+        }
+
+        async function handleDeposit() {
+            const amount = parseFloat(document.getElementById("depositAmount").value);
+            if (isNaN(amount) || amount <= 0) {
+                alert("Please enter a valid deposit amount.");
+                return;
+            }
+
+            const newBalance = currentBalance + amount;
+            await saveBalance(newBalance);
+            updateBalanceDisplay(newBalance);
+
+            document.getElementById("depositSection").style.display = "none";
+            document.getElementById("slotSection").style.display = "block";
+        }
+
+        function updateLines() {
+            const lines = parseInt(document.getElementById("linesInput").value);
+            document.getElementById("slot1Row").style.display = lines >= 2 ? "flex" : "none";
+            document.getElementById("slot2Row").style.display = lines >= 3 ? "flex" : "none";
+        }
+
+        async function handleSpin() {
+    const lines = parseInt(document.getElementById("linesInput").value);
+    const bet = parseFloat(document.getElementById("betInput").value);
+    const totalBet = lines * bet;
+    console.log("bet:", bet, "lines:", lines, "totalBet:", totalBet, "balance:", currentBalance);
+
+
+    if (isNaN(bet) || bet <= 0) {
+        alert("Please enter a valid bet.");
+        return;
+    }
+
+    if (totalBet > currentBalance) {
+        alert("Not enough balance for this bet.");
+        document.getElementById("slotSection").style.display = "none";
+        document.getElementById("depositSection").style.display = "block"
+        return;
+    }
+
+    // Disable spin button during animation
+    const spinBtn = document.querySelector(".btn-spin");
+    spinBtn.disabled = true;
+    spinBtn.textContent = "Spinning...";
+
+    const SYMBOLS_COUNT = { A: 2, B: 4, C: 6, D: 8 };
+    const SYMBOLS_VALUES = { A: 5, B: 4, C: 3, D: 2 };
+
+    const symbols = [];
+    for (const [sym, count] of Object.entries(SYMBOLS_COUNT)) {
+        for (let i = 0; i < count; i++) symbols.push(sym);
+    }
+
+    const reels = [];
+    for (let i = 0; i < 3; i++) {
+        const reelSymbols = [...symbols];
+        const reel = [];
+        for (let j = 0; j < 3; j++) {
+            const idx = Math.floor(Math.random() * reelSymbols.length);
+            reel.push(reelSymbols.splice(idx, 1)[0]);
+        }
+        reels.push(reel);
+    }
+
+    const rows = [];
+    for (let i = 0; i < 3; i++) {
+        rows.push([reels[0][i], reels[1][i], reels[2][i]]);
+    }
+
+    // Clear previous results
+    document.getElementById("spinResult").className = "spin-result";
+    for (let i = 0; i < 9; i++) {
+        const el = document.getElementById(`slot${i}`);
+        el.classList.remove("win", "landing");
+    }
+
+    // Start all reels spinning
+    const allReels = document.querySelectorAll(".slot-reel");
+    allReels.forEach(el => {
+        el.classList.add("spinning");
+        el.textContent = "?";
+    });
+
+    // Stop each column one by one with a delay
+    const stopColumn = (col, delay) => {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                for (let row = 0; row < 3; row++) {
+                    const el = document.getElementById(`slot${row * 3 + col}`);
+                    el.classList.remove("spinning");
+                    el.classList.add("landing");
+                    el.textContent = rows[row][col];
+
+                    // Remove landing class after animation
+                    setTimeout(() => el.classList.remove("landing"), 300);
+                }
+                resolve();
+            }, delay);
+        });
+    };
+
+    await stopColumn(0, 600); 
+    await stopColumn(1, 1000);
+    await stopColumn(2, 1400);
+
+    // Small pause before showing result
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Calculate winnings
+    let winnings = 0;
+    for (let row = 0; row < lines; row++) {
+        if (rows[row].every(s => s === rows[row][0])) {
+            winnings += bet * SYMBOLS_VALUES[rows[row][0]];
+            for (let col = 0; col < 3; col++) {
+                document.getElementById(`slot${row * 3 + col}`).classList.add("win");
+            }
+        }
+    }
+
+    const newBalance = currentBalance - totalBet + winnings;
+    await saveBalance(newBalance);
+    updateBalanceDisplay(newBalance);
+
+    const resultEl = document.getElementById("spinResult");
+    if (winnings > 0) {
+        resultEl.textContent = `🎉 You won $${winnings}!`;
+        resultEl.className = "spin-result win";
+    } else {
+        resultEl.textContent = `😔 No win this time. You lost $${totalBet}.`;
+        resultEl.className = "spin-result lose";
+    }
+
+    // Re-enable spin button
+    spinBtn.disabled = false;
+    spinBtn.textContent = "🎰 SPIN";
+
+    if (newBalance <= 0) {
+        setTimeout(() => {
+            alert("You ran out of money! Please make a new deposit.");
+            document.getElementById("slotSection").style.display = "none";
+            document.getElementById("depositSection").style.display = "block";
+        }, 500);
+    }
+}
+
+        async function saveBalance(balance) {
+            await fetch(`${API}/balance`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ balance })
+            });
+        }
+    </script>
+</body>
+</html>
